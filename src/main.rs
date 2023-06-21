@@ -5,6 +5,7 @@ use std::fmt;
 // Possibly the worst possible recursive decent praser lol
 // Consider this v0.0.0.0.0.0.0.0.0.1 of maybe something ill build seriously lol
 // Obviously cannot handle left recursive or left factored
+// [GENERIC] A grammer will always have states
 #[derive(Debug)]
 enum States {
     START,
@@ -13,6 +14,7 @@ enum States {
     DECL,
 }
 
+// [GENERIC] for code logic
 impl fmt::Display for States {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -24,6 +26,20 @@ impl fmt::Display for States {
     }
 }
 
+// Match states to their grammer defintion [GENERIC]
+impl States {
+    fn reverse_string_state_match_stacks(s: &str) -> Option<Vec<Vec<String>>> {
+        match s {
+            "START" => Some(MatchStacks::default().START),
+            "TYPE" => Some(MatchStacks::default().TYPE),
+            "ARGS" => Some(MatchStacks::default().ARGS),
+            "DECL" => Some(MatchStacks::default().DECL),
+            _ => None,
+        }
+    }
+}
+
+//[GENERIC] Defining the grammer
 struct MatchStacks {
     START: Vec<Vec<String>>,
     TYPE: Vec<Vec<String>>,
@@ -31,7 +47,7 @@ struct MatchStacks {
     DECL: Vec<Vec<String>>,
 }
 
-//Defining the grammer and match rules :
+// [GENERIC] Defining the grammer and match rules :
 impl Default for MatchStacks {
     fn default() -> Self {
         MatchStacks {
@@ -101,15 +117,10 @@ fn recursive_decent_parser(
         for (_, j) in v.iter().enumerate() {
             // [TODO] Should be able to write this match condition withotu all this repetition
             // [TODO] Match string to type and respectively funciton call
-            match j.as_str() {
+            match States::reverse_string_state_match_stacks(j.as_str()) {
                 //States need to go to recursive searches
-                "TYPE" => {
-                    println!("TYPE");
-                    let response = recursive_decent_parser(
-                        MatchStacks::default().TYPE,
-                        &mut offset.clone(),
-                        code,
-                    );
+                Some(stacks) => {
+                    let response = recursive_decent_parser(stacks, &mut offset.clone(), code);
                     println!("{:?}", response);
                     if stack_reponse == false || response.0 == true {
                         stack_reponse = response.0;
@@ -118,52 +129,7 @@ fn recursive_decent_parser(
                         continue 'outer;
                     }
                 }
-                "DECL" => {
-                    println!("DECL");
-                    let response = recursive_decent_parser(
-                        MatchStacks::default().DECL,
-                        &mut offset.clone(),
-                        code,
-                    );
-                    println!("{:?}", response);
-                    if stack_reponse == false || response.0 == true {
-                        stack_reponse = response.0;
-                        *offset = response.1;
-                    } else if response.0 == false {
-                        continue 'outer;
-                    }
-                }
-                "ARGS" => {
-                    println!("ARGS");
-                    let response = recursive_decent_parser(
-                        MatchStacks::default().ARGS,
-                        &mut offset.clone(),
-                        code,
-                    );
-                    println!("{:?}", response);
-                    if stack_reponse == false || response.0 == true {
-                        stack_reponse = response.0;
-                        *offset = response.1;
-                    } else if response.0 == false {
-                        continue 'outer;
-                    }
-                }
-                "START" => {
-                    println!("START");
-                    let response = recursive_decent_parser(
-                        MatchStacks::default().START,
-                        &mut offset.clone(),
-                        code,
-                    );
-                    println!("{:?}", response);
-                    if stack_reponse == false || response.0 == true {
-                        stack_reponse = response.0;
-                        *offset = response.1;
-                    } else if response.0 == false {
-                        continue 'outer;
-                    }
-                }
-                _ => {
+                None => {
                     //Greedy match using regex functions
                     let response = regex_matches(&j, offset.clone(), code);
                     if response.0 == false {
