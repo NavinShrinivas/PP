@@ -1,4 +1,6 @@
 use regex::Regex;
+use std::env;
+use std::file;
 use std::fmt;
 
 // Define all "states" and their matching functions
@@ -83,11 +85,22 @@ impl Default for MatchStacks {
     }
 }
 
-fn regex_matches<'a>(regex_pat: &str, offset: usize, code: &'a str) -> (bool, &'a str) {
+fn regex_matches<'a>(
+    regex_pat: &str,
+    offset: usize,
+    code: &'a str,
+) -> (bool, &'a str, usize, usize) {
     let new_regex_matcher = Regex::new(regex_pat).unwrap();
     match new_regex_matcher.captures_at(code, offset) {
-        Some(matches) => return (true, matches.get(0).unwrap().as_str().clone()),
-        None => return (false, ""),
+        Some(matches) => {
+            return (
+                true,
+                matches.get(0).unwrap().as_str().clone(),
+                matches.get(0).unwrap().end(),
+                matches.get(0).unwrap().start(),
+            )
+        }
+        None => return (false, "", 0, 0),
     };
 }
 
@@ -99,7 +112,7 @@ fn recursive_decent_parser(
     //We need to clone and replicate the input buffer into the next recursive call so that we ca
     //return back to the original posistion in the stack!
     let inital_offset = offset.clone();
-    let mut largest_offset = 0 as usize;
+    let mut largest_offset = inital_offset as usize;
     let mut match_position: Vec<i32> = Vec::new();
     for _ in match_stack.iter().enumerate() {
         match_position.push(0)
@@ -115,31 +128,32 @@ fn recursive_decent_parser(
             stack_reponse = true;
         }
         for (_, j) in v.iter().enumerate() {
-            // [TODO] Should be able to write this match condition withotu all this repetition
-            // [TODO] Match string to type and respectively funciton call
             match States::reverse_string_state_match_stacks(j.as_str()) {
-                //States need to go to recursive searches
                 Some(stacks) => {
                     let response = recursive_decent_parser(stacks, &mut offset.clone(), code);
                     println!("{:?}", response);
-                    if stack_reponse == false || response.0 == true {
+                    if response.0 == true {
                         stack_reponse = response.0;
                         *offset = response.1;
                     } else if response.0 == false {
-                        continue 'outer;
+                        stack_reponse = false;
+                        break;
                     }
                 }
                 None => {
                     //Greedy match using regex functions
                     let response = regex_matches(&j, offset.clone(), code);
+                    println!("{} {:?}", j, response);
                     if response.0 == false {
-                        *offset = inital_offset;
-                        continue 'outer;
-                    } else {
+                        stack_reponse = false;
+                        break;
+                    } else if response.3 == *offset {
                         stack_reponse = true;
-                        *offset += response.1.len();
-                        println!("{:?}", response.1);
-                        continue;
+                        *offset = response.2;
+                        println!("{:?}", response);
+                    } else {
+                        stack_reponse = false;
+                        break;
                     }
                 }
             }
@@ -166,8 +180,23 @@ fn main() {
     println!("Parsing code...");
     let mut offset: usize = 0;
     //[TODO] Read code from file
+    // let mut file_name: String;
+    // let args: Vec<String> = env::args().collect();
+    // for (i, v) in args.iter().enumerate() {
+    //     if v.to_string() == "file".to_string() {
+    //         file_name = match args.get(i + 1) {
+    //             Some(txt) => txt.to_string(),
+    //             None => panic!("Godddamit, give me a file name!"),
+    //         }
+    //     }
+    // }
+
     println!(
         "{:?}",
-        recursive_decent_parser(MatchStacks::default().START, &mut offset, "int fn_name(){}"),
+        recursive_decent_parser(
+            MatchStacks::default().START,
+            &mut offset,
+            "int fn_name(int x,T y){}"
+        ),
     );
 }
